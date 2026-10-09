@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/webp" href="assets/icons/brachydios.webp">
+<title>MHGU Talisman Odds</title>
+<style>
+/* Layout: the Armor Skills Explained frame. Talisman builder in the left panel, the odds card on the right.
+   One dark look by design, shared with the sibling MHGU apps: MHFU game font, grey title bar over the
+   titlebar texture, dark rocky panels, thin translucent lines. Slime green marks the best route. */
+@font-face { font-family: 'MHFU'; src: url('fonts/mhfu_font.ttf') format('truetype'); font-display: swap; }
+:root {
+  /* Brachydios, as in Charm Farm: every surface is Charm Farm's lightness scaling of its theme
+     colour #0B2757 (app.js applyTheme). Highlights are the slime green on his icon, #9cd752. */
+  --bg: #081b3d; --content-bg: #061530; --panel-bg: #041023; --bg2: #0a2553;
+  --accent: #081b3d; --accent-hover: #246ae3;
+  --control-bg: #040d1e; --control-bg-hover: #051025;
+  --text: #f3f3f3; --line: #ffffff1f; --line-soft: #ffffff0d;
+  --positive: #7fdc7f; --negative: #f07070; --hi: #9cd752; --hi-line: #4b6b27; --hi-wash: #9cd75214;
+  --row-hit: #9cd7522e; --shade: #00000030; --shade-deep: #00000040; --hover: #ffffff10; --chip: #ffffff0c;
+  --link: #8fd8ff;
+  --font: 'MHFU', "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; scrollbar-color: var(--accent) var(--bg2); scrollbar-width: thin; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body { font-family: var(--font); font-size: 14px; color: var(--text); background: var(--bg); }
+input, button, select { font-family: inherit; }
+#app { display: flex; flex-direction: column; height: 100%; }
+
+/* Title bar */
+.titlebar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; flex-shrink: 0; flex-wrap: wrap;
+  background-image: linear-gradient(color-mix(in srgb, var(--accent) 90%, transparent), color-mix(in srgb, var(--accent) 90%, transparent)), url('assets/titlebar-background.png');
+  background-size: auto 100%; background-position: left center; background-repeat: repeat; }
+.title-icon { width: 30px; height: 30px; object-fit: contain; }
+.titlebar h1 { font-size: 15px; font-weight: 600; margin: 0; }
+.titlebar-spacer { margin-left: auto; }
+.icon-btn { background: transparent; border: none; color: var(--text); font-size: 18px; cursor: pointer; padding: 6px 9px; border-radius: 6px; line-height: 1; }
+.icon-btn:hover { background: #ffffff1a; }
+.btn.tiny { padding: 5px 10px; font-size: 12px; text-decoration: none; display: inline-block; color: var(--text); border: 1px solid var(--line); border-radius: 7px; cursor: pointer;
+  background-image: linear-gradient(color-mix(in srgb, var(--control-bg) 88%, transparent), color-mix(in srgb, var(--control-bg) 88%, transparent)), url('assets/banner-background.png');
+  background-position: right; }
+.btn.tiny:hover { background-image: linear-gradient(color-mix(in srgb, var(--control-bg-hover) 88%, transparent), color-mix(in srgb, var(--control-bg-hover) 88%, transparent)), url('assets/banner-background.png'); }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 1px; }
+
+/* Layout */
+.layout { display: flex; flex: 1; min-height: 0; overflow: hidden;
+  background-color: var(--content-bg);
+  background-image: linear-gradient(color-mix(in srgb, var(--content-bg) 84%, transparent), color-mix(in srgb, var(--content-bg) 84%, transparent)), url('assets/rockyTextureDark.png');
+  background-repeat: repeat; background-size: auto, 200px 200px; }
+.index { flex: 0 0 310px; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); overflow-y: auto;
+  background-color: var(--panel-bg);
+  background-image: linear-gradient(color-mix(in srgb, var(--panel-bg) 90%, transparent), color-mix(in srgb, var(--panel-bg) 90%, transparent)), url('assets/rockyTextureDark2.png');
+  background-repeat: repeat; background-size: auto, 200px 200px; }
+.builder { padding: 12px 14px 18px; display: grid; gap: 14px; }
+.field { display: grid; gap: 6px; }
+.lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; opacity: .6; }
+.skill-row { display: grid; grid-template-columns: 1fr 70px; gap: 6px; }
+.mini-select, .num { width: 100%; min-width: 0; background: var(--control-bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 13px; }
+.mini-select { cursor: pointer; }
+.mini-select:hover, .num:hover { background: var(--control-bg-hover); }
+.num { font-variant-numeric: tabular-nums; }
+.seg { display: flex; flex-wrap: wrap; gap: 5px; }
+.nav-btn { font-size: 12px; line-height: 16px; padding: 4px 11px; background: var(--control-bg); border: 1px solid var(--line); border-radius: 4px; color: var(--text); cursor: pointer; }
+.nav-btn:hover { background: var(--control-bg-hover); }
+.nav-btn[aria-pressed="true"] { background: #0e0e0e; color: #fff; box-shadow: inset 0 -2px 0 var(--accent-hover); }
+.hint { font-size: 12px; opacity: .65; line-height: 1.45; margin: 0; }
+.warn { font-size: 12px; color: var(--negative); margin: 0; }
+.inputs3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+
+.main { flex: 1; min-width: 0; overflow-y: auto; padding: 14px 16px 28px; }
+.card { border: 1px solid var(--line); border-radius: 9px; background: var(--shade); padding: 14px 18px 18px; max-width: 920px; }
+.card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.card-head .title-icon { width: 34px; height: 34px; }
+h2.tal { font-size: 20px; font-weight: 600; margin: 0; text-wrap: balance; }
+.pips { display: inline-flex; gap: 4px; align-items: center; }
+.pip { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--text); }
+.pip.off { border: none; width: 11px; height: 2px; border-radius: 1px; background: var(--text); opacity: .45; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
+.tag { font-size: 11px; border: 1px solid var(--line); border-radius: 9px; padding: 1px 8px; background: var(--chip); white-space: nowrap; }
+.res-title { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; opacity: .6; margin: 20px 0 6px; }
+.md { line-height: 1.55; max-width: 78ch; }
+.md p { margin: 0 0 10px; }
+
+.answer { margin-top: 14px; border: 1px solid var(--hi-line); border-radius: 7px; padding: 12px 14px; background: var(--hi-wash); display: grid; gap: 4px; max-width: 640px; }
+.answer .k { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; opacity: .65; }
+.answer .v { font-size: 26px; color: var(--hi); font-variant-numeric: tabular-nums; }
+.answer .s { font-size: 13px; opacity: .85; line-height: 1.45; }
+.md.none { margin-top: 14px; color: var(--negative); }
+.ways { max-width: 640px; }
+.ways td { padding-top: 7px; padding-bottom: 7px; font-size: 13px; }
+ol.steps { margin: 4px 0 8px; padding-left: 22px; max-width: 74ch; line-height: 1.55; font-size: 13.5px; }
+ol.steps li { margin-bottom: 6px; padding-left: 2px; }
+.md.sum { color: var(--hi); }
+details.more { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+details.more:first-of-type { margin-top: 18px; }
+details.more + details.more { margin-top: 0; }
+details.more[open] { padding-bottom: 6px; }
+details.more summary { cursor: pointer; font-size: 13px; padding: 4px 0; width: fit-content; }
+details.more[open] > summary { color: var(--hi); margin-bottom: 6px; }
+.meld-inputs { max-width: 420px; margin: 4px 0 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--shade-deep); }
+details.more summary:hover { color: var(--hi); }
+details.more summary:focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 2px; }
+
+.tbl { overflow-x: auto; margin: 2px 0 6px; }
+.tbl table { border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; min-width: 100%; }
+.tbl th { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; font-weight: 400; opacity: .6; text-align: left; padding: 4px 14px 4px 0; border-bottom: 1px solid var(--line); vertical-align: bottom; white-space: nowrap; }
+.tbl td { padding: 5px 14px 5px 0; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+.tbl td.num-c { white-space: nowrap; text-align: right; }
+.tbl th.num-c { text-align: right; }
+.tbl tr.best td { color: var(--hi); }
+.tbl tr.best td:first-child { box-shadow: inset 3px 0 var(--hi); padding-left: 8px; }
+.tbl td.no { opacity: .55; font-style: italic; }
+.slotgrid td.hit { background: var(--row-hit); }
+.slotgrid td.idx { opacity: .6; }
+.note { font-size: 12px; opacity: .7; margin: 0 0 6px; max-width: 78ch; line-height: 1.45; }
+
+/* Modals (as in the sibling apps) */
+.modal { position: fixed; inset: 0; background: #000000a8; display: flex; align-items: center; justify-content: center; z-index: 20; padding: 20px; }
+.modal[hidden] { display: none; }
+.modal-card { position: relative; background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 20px; max-width: 620px; width: 100%; max-height: 84vh; overflow-y: auto; }
+.modal-card h2 { margin: 0 0 14px; font-size: 18px; }
+.modal-card h3 { margin: 16px 0 8px; font-size: 14px; }
+.modal-card p, .modal-card li { line-height: 1.5; }
+.modal-card p { margin: 0 0 10px; }
+.modal-card ol, .modal-card ul { margin: 0 0 10px; padding-left: 20px; }
+.modal-card li { margin-bottom: 5px; }
+.modal-card a { color: var(--link); }
+.muted { font-size: 13px; opacity: .75; }
+.btn { background: #ffffff14; color: var(--text); border: 1px solid var(--line); border-radius: 7px; padding: 8px 14px; cursor: pointer; font-size: 14px; }
+.btn:hover { background: #ffffff24; }
+.row-end { display: flex; justify-content: flex-end; gap: 8px; }
+.app-links { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.app-links li { border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; background: #ffffff08; }
+.app-links li.current { opacity: .72; }
+.app-links a, .app-name { font-weight: 600; font-size: 14px; }
+.app-here { font-weight: 400; font-size: 11px; opacity: .7; border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; margin-left: 7px; }
+.app-desc { display: block; margin-top: 3px; font-size: 12px; opacity: .8; line-height: 1.4; }
+
+@media (max-width: 760px) {
+  html, body { overflow: auto; height: auto; }
+  #app { height: auto; }
+  .layout { flex-direction: column; overflow: visible; }
+  .index { flex: none; border-right: none; border-bottom: 1px solid var(--line); overflow: visible; }
+  .main { overflow: visible; padding-inline: 16px; }
+  .card { padding-inline: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header class="titlebar">
+    <img class="title-icon" src="assets/icons/brachydios.webp" alt="Brachydios">
+    <h1>MHGU Talisman Odds</h1>
+    <span class="titlebar-spacer"></span>
+    <button id="howBtn" class="btn tiny" type="button">How talismans roll</button>
+    <button id="linksBtn" class="icon-btn" type="button" title="Other MHGU apps" aria-label="Other MHGU apps">&#128279;</button>
+    <button id="aboutBtn" class="icon-btn" type="button" title="About" aria-label="About">&#9432;</button>
+  </header>
+  <div class="layout">
+    <aside class="index" aria-label="Your talisman">
+      <form class="builder" id="builder" autocomplete="off">
+        <div class="field">
+          <span class="lbl" id="s1lbl">Skill 1 and points</span>
+          <div class="skill-row">
+            <select id="s1" class="mini-select" aria-labelledby="s1lbl"></select>
+            <select id="p1" class="mini-select num" aria-label="Skill 1 points"></select>
+          </div>
+        </div>
+        <div class="field">
+          <span class="lbl" id="s2lbl">Skill 2 and points</span>
+          <div class="skill-row">
+            <select id="s2" class="mini-select" aria-labelledby="s2lbl"></select>
+            <select id="p2" class="mini-select num" aria-label="Skill 2 points"></select>
+          </div>
+        </div>
+        <div class="field">
+          <span class="lbl">Decoration slots</span>
+          <div class="seg" id="slots" role="group" aria-label="Decoration slots">
+            <button type="button" class="nav-btn" data-slots="0">0</button>
+            <button type="button" class="nav-btn" data-slots="1">1</button>
+            <button type="button" class="nav-btn" data-slots="2">2</button>
+            <button type="button" class="nav-btn" data-slots="3">3</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="lbl">Count</span>
+          <div class="seg" role="group" aria-label="Which talismans count">
+            <button type="button" class="nav-btn" id="mAtLeast">This or better</button>
+            <button type="button" class="nav-btn" id="mExact">Exactly this</button>
+          </div>
+          <p class="hint" id="modeHint"></p>
+        </div>
+        <p class="warn" id="warn" hidden></p>
+      </form>
+    </aside>
+    <main class="main" id="main" aria-live="polite"></main>
+  </div>
+</div>
+
+<!-- Halcyon / Juju inputs. Built once so their state and listeners persist; update() places this
+     block inside the Melding Pot panel on every render. -->
+<div class="field meld-inputs" id="meldInputs" hidden>
+  <span class="lbl" id="inLbl">Talismans you put in (Halcyon and Juju)</span>
+  <div class="inputs3">
+    <select id="in1" class="mini-select" aria-labelledby="inLbl"></select>
+    <select id="in2" class="mini-select" aria-labelledby="inLbl"></select>
+    <select id="in3" class="mini-select" aria-labelledby="inLbl"></select>
+  </div>
+</div>
+
+<div id="howModal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-labelledby="howTitle">
+    <h2 id="howTitle">How talismans roll</h2>
+    <p>A charm is turned into a talisman in one roll, the same way whether it came from a quest or the Melding Pot. Each of the four charms has its own skill tables and its own slot table.</p>
+    <ol>
+      <li><strong>First skill.</strong> One entry of the charm's first-skill table, every entry equally likely. There are no weights. Its points are any value in the entry's range, each equally likely.</li>
+      <li><strong>Second skill or not.</strong> Mystery Charms never get one. Shining get one 65% of the time, Timeworn 75%, Enduring 85%.</li>
+      <li><strong>Second skill.</strong> One entry of the second-skill table, equally likely. If its range runs from negative to positive, a coin flip picks the side first: half the time it rolls 1 to the top, half the time the minimum to 0. A roll of 0 removes the skill. If it lands on the same skill as the first, the second skill is deleted, not rerolled.</li>
+      <li><strong>Skill strength.</strong> The game rates each skill against the best it could have rolled. A skill at its top value counts as fully strong; a negative second skill counts as nothing.</li>
+      <li><strong>Slots.</strong> The stronger the skills, the worse the slot odds. A talisman with both skills at their top value gets the worst slot odds the charm has.</li>
+      <li><strong>Which talisman.</strong> Strong skills and more slots give the higher name. Each charm has its own set: Pawn and Bishop, Knight and Rook, Queen to Dragon, Hero to Creator.</li>
+    </ol>
+    <h3>The Melding Pot</h3>
+    <p>You trade 3 talismans and Wycademy Points for charms. Every melded charm rolls its second skill on the positive side only, so a melded talisman never has a negative or zero second skill.</p>
+    <ul>
+      <li><strong>Mystery, Luminous, Ancient, Fabled:</strong> 3 talismans of one band for 1 Mystery, Shining, Timeworn or Enduring Charm.</li>
+      <li><strong>Halcyon:</strong> any 3 from Pawn to Dragon for 1 to 6 Mystery, Shining or Timeworn Charms.</li>
+      <li><strong>Juju:</strong> any 3 from Pawn to Dragon for up to 2 Enduring Charms plus 1 or 2 Timeworn.</li>
+    </ul>
+    <p>For Halcyon and Juju, higher talismans (up to Dragon) make more charms. Three Queen, King or Dragon Talismans make Juju give exactly 2 Enduring Charms every time.</p>
+    <p>The talismans are rolled the moment you place the order. The wait in quests only counts down; finishing a quest moves every order one step closer.</p>
+    <div class="row-end"><button class="btn" type="button" data-close>Close</button></div>
+  </div>
+</div>
+
+<div id="linksModal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-labelledby="linksTitle">
+    <h2 id="linksTitle">Other MHGU Apps</h2>
+    <p class="muted">For Non-MHGU Apps, you can visit the <a href="https://armoredraven17.github.io/" target="_blank" rel="noopener">Home Page</a></p>
+    <ul class="app-links">
+      <li><a href="https://armoredraven17.github.io/MHGU-Quest-Randomizer/" target="_blank" rel="noopener">Quest Randomizer</a><span class="app-desc">Rolls random quests when you can't decide what to hunt.</span></li>
+      <li><a href="https://armoredraven17.github.io/mhgu-collection-tracker/" target="_blank" rel="noopener">Collection Tracker</a><span class="app-desc">Tracks which weapons, armor and Palico gear you own, and what it costs to finish them.</span></li>
+      <li><a href="https://armoredraven17.github.io/mhgu-equipment-box/" target="_blank" rel="noopener">Equipment Box</a><span class="app-desc">Mirrors the in-game box — 2000 hunter slots and 1000 Palico — so you can plan where things sit.</span></li>
+      <li><a href="https://armoredraven17.github.io/MHGU-Bingo/" target="_blank" rel="noopener">Bingo</a><span class="app-desc">Builds a bingo card of hunting goals, with a shareable seed so a group can race the same board.</span></li>
+      <li><a href="https://armoredraven17.github.io/MHGU-Hunting-Log/" target="_blank" rel="noopener">Hunting Log</a><span class="app-desc">Keeps a running record of your hunts — what you were after, what you wore, who came along.</span></li>
+      <li><a href="https://armoredraven17.github.io/MHGU-Zenny-Gauntlet/" target="_blank" rel="noopener">Zenny Gauntlet</a><span class="app-desc">A scored challenge run — fail a hunt or get carted and you lose that weapon/style combo for the rest of the run.</span></li>
+      <li><a href="https://armoredraven17.github.io/mhgu-set-builder/" target="_blank" rel="noopener">Set Builder</a><span class="app-desc">Assemble a full set by hand and see exactly which skills it activates.</span></li>
+      <li><a href="https://armoredraven17.github.io/mhgu-weapon-trees/" target="_blank" rel="noopener">Weapon Trees</a><span class="app-desc">Browse every weapon upgrade tree, with full stats on any node you click.</span></li>
+      <li><a href="https://armoredraven17.github.io/MHGU-Challenge-Run/" target="_blank" rel="noopener">Challenge Run</a><span class="app-desc">A permadeath challenge run — start from a root weapon, lose it on any quest failure, clear every Key Quest.</span></li>
+      <li><a href="https://armoredraven17.github.io/mhgu-charm-farm/" target="_blank" rel="noopener">Charm Farm</a><span class="app-desc">A Clicker/Idle game about beating up various Brachydios until you finally get the desired God Charms you always wanted.</span></li>
+      <li><a href="https://armoredraven17.github.io/mhgu-talisman-bingo/" target="_blank" rel="noopener">Talisman Bingo</a><span class="app-desc">A bingo card of talisman conditions — keep drawing charms until one finally fills the line you needed.</span></li>
+      <li><a href="https://armoredraven17.github.io/mhgu-fishing/" target="_blank" rel="noopener">Fishing</a><span class="app-desc">A fishing sim on the game's own tables — prepare at camp, travel to a locale, come home with the catch.</span></li>
+      <li><a href="https://armoredraven17.github.io/mhgu-armor-viewer/" target="_blank" rel="noopener">Armor Viewer</a><span class="app-desc">Renders a hunter in 3D with every armor piece swappable, so you can mix and match a set.</span></li>
+      <li><a href="https://armoredraven17.github.io/mhgu-monster-viewer/" target="_blank" rel="noopener">Monster Viewer</a><span class="app-desc">Renders every monster in 3D with its own motion lists, so you can watch what they actually do.</span></li>
+      <li><a href="https://armoredraven17.github.io/mhgu-armor-skills-explained/" target="_blank" rel="noopener">Armor Skills Explained</a><span class="app-desc">Every armor skill: the game's own description, then what it actually does, with the numbers.</span></li>
+      <li class="current"><span class="app-name">Talisman Odds <span class="app-here">you are here</span></span><span class="app-desc">Enter a talisman and see the exact odds of rolling it, from quest charms and the Melding Pot.</span></li>
+    </ul>
+    <div class="row-end"><button class="btn" type="button" data-close>Close</button></div>
+  </div>
+</div>
+
+<div id="aboutModal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-labelledby="aboutTitle">
+    <h2 id="aboutTitle">About</h2>
+    <p>An unofficial, non-commercial fan reference for MHGU's talismans. Enter a talisman and it shows the exact chance of getting it from each charm and each Melding Pot style, and how that number is built.</p>
+    <p><strong>Where the numbers come from:</strong> the game's own charm tables and the code that rolls them, read from the game files. The calculation here was checked against the game's own code, run step by step, before it was published. The odds are exact, not estimates from simulated rolls.</p>
+    <p><strong>Development:</strong> Built by the author with substantial help from <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a>, Anthropic's AI coding tool, reviewed and directed by the author.</p>
+    <p><strong>Menu textures and font:</strong> carried over from the sibling MHGU apps.</p>
+    <p><strong>Brachydios icon:</strong> from the <a href="https://monsterhunter.fandom.com/" target="_blank" rel="noopener">Monster Hunter Wiki on Fandom</a>, by way of Charm Farm, licensed <a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noopener">CC BY-SA 3.0</a>.</p>
+    <p class="muted">Monster Hunter content is owned by Capcom. This tool is not affiliated with or endorsed by Capcom.</p>
+    <div class="row-end"><button class="btn" type="button" data-close>Close</button></div>
+  </div>
+</div>
+
+<script src="talisman-data.js?v=1"></script>
+<script src="talisman-engine.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  const D = window.TALISMAN_DATA, E = window.TalismanOdds(D);
+  // Elements with an id are built once and never replaced, so each is looked up once and kept.
+  // The Melding Pot pickers move into the card on every render, and getElementById can't find
+  // them while the old card is detached; a fresh lookup there returned null and broke every update.
+  const byId = {};
+  const $ = id => byId[id] || (byId[id] = document.getElementById(id));
+  for (const el of document.querySelectorAll("[id]")) byId[el.id] = el;
+  const KEY = "mhgu-talisman-odds-query";
+  const CHARM = ["Mystery Charm", "Shining Charm", "Timeworn Charm", "Enduring Charm"];
+  const ids = Object.keys(D.names).map(Number).sort((a, b) => D.names[a].localeCompare(D.names[b]));
+  const byName = n => ids.find(i => D.names[i] === n);
+
+  // ---------- small DOM helper: text only, never HTML ----------
+  function h(tag, props, ...kids) {
+    const el = document.createElement(tag);
+    if (props) for (const [k, v] of Object.entries(props)) {
+      if (v == null || v === false) continue;
+      if (k === "class") el.className = v; else if (k === "text") el.textContent = v; else el.setAttribute(k, v);
+    }
+    for (const k of kids.flat()) if (k != null && k !== false) el.append(k instanceof Node ? k : document.createTextNode(String(k)));
+    return el;
+  }
+
+  // ---------- number formatting ----------
+  const fmtInt = n => Math.round(n).toLocaleString("en-US");
+  function oneIn(p) {
+    if (!(p > 0)) return "Can't happen";
+    if (p >= 0.1) return (p * 100).toFixed(p >= 0.995 ? 0 : 1) + "%";
+    const n = 1 / p;
+    return "1 in " + (n >= 1e6 ? big(n) : fmtInt(n));
+  }
+  function big(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(n >= 1e11 ? 0 : 1) + " billion";
+    if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e8 ? 0 : 1) + " million";
+    return fmtInt(n);
+  }
+  const pct = v => v >= 0.995 ? "100%" : (v * 100 >= 10 ? Math.round(v * 100) : (v * 100).toFixed(1)) + "%";
+
+  // The positive points each skill can roll on some charm, as the first or second skill. The points
+  // pickers offer only these, so a value the skill can never have can't be entered.
+  const VALS = {};
+  for (const t of D.skill) for (const [id, lo, hi] of t) {
+    const set = VALS[id] || (VALS[id] = new Set());
+    for (let p = Math.max(1, lo); p <= hi; p++) set.add(p);
+  }
+  for (const id in VALS) VALS[id] = [...VALS[id]].sort((a, b) => a - b);
+  const valsOf = id => VALS[id] && VALS[id].length ? VALS[id] : [1];
+  // Keep p if the skill can roll it; otherwise the nearest value below it, or the lowest one.
+  function fitPts(id, p) {
+    const v = valsOf(id);
+    if (v.includes(p)) return p;
+    const below = v.filter(x => x < p);
+    return below.length ? below[below.length - 1] : v[0];
+  }
+
+  // ---------- state ----------
+  let state = { s1: byName("Tenderizer"), p1: 6, s2: byName("Expert"), p2: 10, slots: 3, exact: false, inputs: [5, 5, 5] };
+  try { const saved = JSON.parse(localStorage.getItem(KEY) || "null"); if (saved && D.names[saved.s1]) state = Object.assign(state, clean(saved)); } catch (e) {}
+  function clean(s) {
+    const n = (v, lo, hi, d) => Number.isInteger(v) && v >= lo && v <= hi ? v : d;
+    return {
+      s1: D.names[s.s1] ? s.s1 : state.s1, p1: n(s.p1, 1, 14, 1),
+      s2: s.s2 === 0 || D.names[s.s2] ? s.s2 : 0, p2: n(s.p2, 1, 14, 1),
+      slots: n(s.slots, 0, 3, 0), exact: s.exact === true,
+      inputs: Array.isArray(s.inputs) && s.inputs.length === 3 ? s.inputs.map(v => n(v, 1, 7, 5)) : [5, 5, 5],
+    };
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  // ---------- builder ----------
+  function fillSkills(sel, withNone) {
+    if (withNone) sel.append(h("option", { value: "0", text: "No second skill" }));
+    for (const i of ids) sel.append(h("option", { value: String(i), text: D.names[i] }));
+  }
+  fillSkills($("s1"), false); fillSkills($("s2"), true);
+  for (const id of ["in1", "in2", "in3"])
+    for (let r = 1; r <= 7; r++) $(id).append(h("option", { value: String(r), text: E.RARITY[r] }));
+
+  // Rebuild a points picker for its skill's values, only when the skill changed.
+  function fillPts(sel, id, value) {
+    if (sel.dataset.skill !== String(id)) {
+      sel.replaceChildren();
+      if (!id) sel.append(h("option", { value: "0", text: "—" }));
+      else for (const p of valsOf(id)) sel.append(h("option", { value: String(p), text: "+" + p }));
+      sel.dataset.skill = String(id);
+    }
+    sel.value = String(id ? value : 0);
+    sel.disabled = !id;
+  }
+  function syncForm() {
+    state.p1 = fitPts(state.s1, state.p1);
+    if (state.s2) state.p2 = fitPts(state.s2, state.p2);
+    $("s1").value = String(state.s1); fillPts($("p1"), state.s1, state.p1);
+    $("s2").value = String(state.s2); fillPts($("p2"), state.s2, state.p2);
+    for (const b of document.querySelectorAll("[data-slots]")) b.setAttribute("aria-pressed", String(Number(b.dataset.slots) === state.slots));
+    $("mAtLeast").setAttribute("aria-pressed", String(!state.exact));
+    $("mExact").setAttribute("aria-pressed", String(state.exact));
+    $("modeHint").textContent = state.exact
+      ? "Only a talisman exactly like this counts."
+      : "Higher points or more slots count too.";
+    ["in1", "in2", "in3"].forEach((id, i) => { $(id).value = String(state.inputs[i]); });
+  }
+  function onChange() {
+    state.s1 = Number($("s1").value); state.p1 = Number($("p1").value) || 1;
+    state.s2 = Number($("s2").value); state.p2 = Number($("p2").value) || state.p2 || 1;
+    state.inputs = ["in1", "in2", "in3"].map(id => Number($(id).value));
+    update();   // syncForm() then pulls each points value into its skill's range
+  }
+  for (const id of ["s1", "s2", "p1", "p2", "in1", "in2", "in3"]) $(id).addEventListener("change", onChange);
+  for (const b of document.querySelectorAll("[data-slots]")) b.addEventListener("click", () => { state.slots = Number(b.dataset.slots); update(); });
+  $("mAtLeast").addEventListener("click", () => { state.exact = false; update(); });
+  $("mExact").addEventListener("click", () => { state.exact = true; update(); });
+  $("builder").addEventListener("submit", e => e.preventDefault());
+
+  // ---------- results ----------
+  function query() {
+    const skills = [{ id: state.s1, pts: state.p1 }];
+    if (state.s2) skills.push({ id: state.s2, pts: state.p2 });
+    return { skills, slots: state.slots, exact: state.exact };
+  }
+
+  // Rebuilding the card moves the melding pickers, which drops their keyboard focus; put it back.
+  function update() {
+    const f = document.activeElement && document.activeElement.id;
+    render();
+    if (/^in[123]$/.test(f || "") && $(f).isConnected) $(f).focus();
+  }
+  function render() {
+    syncForm(); save();
+    const main = $("main"); main.replaceChildren();
+    const warn = $("warn");
+    if (state.s2 && state.s2 === state.s1) {
+      warn.textContent = "Pick two different skills. A talisman can't have the same skill twice.";
+      warn.hidden = false;
+      main.append(h("div", { class: "card" }, h("p", { class: "md", text: "Choose a different second skill, or set it to No second skill." })));
+      return;
+    }
+    warn.hidden = true;
+    const q = query();
+    const pts = E.pointsKey(E.pointsOf(state.inputs));
+    // Quest charms of each kind, and each Melding Pot style's order (used by the panels).
+    const routes = [];
+    for (let k = 0; k < 4; k++) { const r = E.charm(k, false, q); routes.push({ kind: k, p: r.p, r }); }
+    E.STYLES.forEach((st, i) => { const o = E.meldOrder(i, q, pts); routes.push({ style: i, p: o.p, o }); });
+    const bestQ = routes.filter(x => x.kind != null && x.p > 0).sort((a, b) => b.p - a.p)[0];
+
+    const card = h("div", { class: "card" });
+    main.append(card);
+
+    // the talisman as entered
+    const name = q.skills.map(s => `${D.names[s.id]} +${s.pts}`).join(" · ");
+    const pips = h("span", { class: "pips", "aria-label": `${state.slots} decoration slot${state.slots === 1 ? "" : "s"}` },
+      [0, 1, 2].map(i => h("span", { class: i < state.slots ? "pip" : "pip off" })));
+    card.append(h("div", { class: "card-head" },
+      h("img", { class: "title-icon", src: "assets/icons/icon_talisman.png", alt: "" }),
+      h("h2", { class: "tal", text: name }), pips,
+      h("span", { class: "tags" }, h("span", { class: "tag", text: state.exact ? "Exactly this" : "This or better" }))));
+
+    // The odds per charm rolled, for quest charms and for melded charms. Both lists use the same
+    // unit; how many charms an order or a quest run hands out is a separate matter (notes below).
+    const questCharm = [0, 1, 2, 3].map(k => ({ k, p: routes.find(x => x.kind === k).p }));
+    const meldCharm = [0, 1, 2, 3].map(k => ({ k, p: E.charm(k, true, q).p }));
+    const qOk = questCharm.filter(x => x.p > 0).sort((a, b) => b.p - a.p);
+    const mOk = meldCharm.filter(x => x.p > 0).sort((a, b) => b.p - a.p);
+    if (!qOk.length && !mOk.length) {
+      card.append(h("p", { class: "md none", text: "This talisman can't be made. No charm and no Melding Pot option can roll it. \"More detail\" below shows the points each skill can reach." }));
+    } else {
+      // One list, one unit: the chance each charm rolled becomes this talisman. Why melded charms
+      // differ, and how fast orders come, live in the Melding Pot panel.
+      const rows = [...qOk.map(x => ({ ...x, label: CHARM[x.k] })), ...mOk.map(x => ({ ...x, label: `${CHARM[x.k]}, melded` }))]
+        .sort((a, b) => b.p - a.p);
+      card.append(h("div", { class: "res-title", text: "Odds per charm rolled" }));
+      card.append(h("div", { class: "tbl" }, h("table", { class: "ways" }, h("tbody", null,
+        rows.map((x, i) => h("tr", { class: i === 0 ? "best" : null }, h("td", { text: x.label }),
+          h("td", { class: "num-c", text: x.p >= 0.1 ? `${oneIn(x.p)} per charm` : `${oneIn(x.p)} charms` })))))));
+      const cantK = [0, 1, 2, 3].filter(k => !(questCharm[k].p > 0) && !(meldCharm[k].p > 0));
+      if (cantK.length) card.append(h("p", { class: "note", text: "Can't come from " + cantK.map(k => CHARM[k] + "s").join(", ").replace(/, ([^,]*)$/, " or $1") + "." }));
+      card.append(h("p", { class: "note", text: "\"1 in 1,000 charms\" means you'd roll about 1,000 charms on average to get one. You might get lucky sooner, or it might take longer." }));
+    }
+
+    // farming a particular quest: its sub-quest reward, per run
+    for (const qf of D.quests || []) farmPanel(card, qf, q);
+
+    // how it's rolled, with this talisman's numbers; each in its own collapsible panel
+    if (bestQ) {
+      const quest = panel(card, "quest", "How a quest charm is rolled");
+      quest.append(h("p", { class: "md", text: `When a quest gives you a charm, the game turns it into a talisman in a few steps. Here are the steps for this talisman from an ${CHARM[bestQ.kind]}, the best of the quest charms.` }));
+      quest.append(stepList(bestQ.kind, false, q, bestQ.r));
+    }
+    const meldText = meldExplain(q, pts, routes);
+    if (meldText.length) {
+      const pot = panel(card, "meld", "How the Melding Pot changes it");
+      for (const t of meldText) {
+        if (t === INPUTS) { $("meldInputs").hidden = false; pot.append($("meldInputs")); }
+        else pot.append(h("p", { class: "md", text: t }));
+      }
+    }
+
+    // the dense tables
+    const det = panel(card, "more", "More detail");
+    const add = (...els) => det.append(...els);
+    if (bestQ) add(slotTable(bestQ.kind, bestQ.r.rows));
+    add(h("div", { class: "res-title", text: "Where these skills can appear" }));
+    add(h("p", { class: "note", text: "The points each skill can roll on each charm, as the first or the second skill." }));
+    const wt = h("table", null, h("thead", null, h("tr", null, h("th", { text: "Skill" }),
+      CHARM.map(c => h("th", { text: c.replace(" Charm", "") })))));
+    const wb = h("tbody");
+    for (const s of q.skills) {
+      wb.append(h("tr", null, h("td", { text: D.names[s.id] }), [0, 1, 2, 3].map(k => {
+        const a = D.skill[2 * k].find(r => r[0] === s.id), b = D.skill[2 * k + 1].find(r => r[0] === s.id);
+        const parts = [];
+        if (a) parts.push(`1st: ${a[1]} to ${a[2]}`);
+        if (b) parts.push(`2nd: ${b[1]} to ${b[2]}`);
+        return h("td", { class: parts.length ? null : "no", text: parts.length ? parts.join(", ") : "never" });
+      })));
+    }
+    wt.append(wb); add(h("div", { class: "tbl" }, wt));
+  }
+
+  // A collapsible panel, closed by default. update() rebuilds the card on every input change,
+  // so which panels are open is kept here and reapplied.
+  const panelOpen = {};
+  function panel(parent, id, title) {
+    const d = h("details", { class: "more", open: panelOpen[id] ? "" : null }, h("summary", { text: title }));
+    d.addEventListener("toggle", () => { panelOpen[id] = d.open; });
+    parent.append(d);
+    return d;
+  }
+
+  // A quest people farm for charms: what one run's sub-quest reward gives, and runs for this talisman.
+  function farmPanel(card, qf, q) {
+    const r = E.questRun(qf, q);
+    const p = panel(card, "farm" + qf.id, `Farming ${qf.name}`);
+    p.append(h("div", { class: "answer" },
+      h("span", { class: "k", text: "Your talisman from this quest" }),
+      h("span", { class: "v", text: r.p > 0 ? `${oneIn(r.p)} ${r.p >= 0.1 ? "chance per run" : "runs"}` : "Can't happen" }),
+      h("span", { class: "s", text: r.p > 0 ? "Counting the charms from the sub-quest reward." : "None of the charms this reward gives can make it." })));
+    const kinds = [3, 2, 1, 0].filter(k => r.charms[k] > 0);
+    p.append(h("div", { class: "res-title", text: "One run gives on average" }));
+    p.append(h("div", { class: "tbl" }, h("table", { class: "ways" }, h("tbody", null,
+      kinds.map(k => h("tr", null, h("td", { text: `${CHARM[k]}s` }), h("td", { class: "num-c", text: r.charms[k].toFixed(1) })))))));
+    const counts = qf.entries.map(e => e[1]);
+    p.append(h("p", { class: "note", text: `The sub-quest reward lists ${r.minRolls} to ${r.maxRolls} items per run (${r.meanRolls.toFixed(1)} on average). Each item is a stack of ${Math.min(...counts)} to ${Math.max(...counts)} charms of one kind.` }));
+  }
+
+  // ---------- plain-language explanation ----------
+  const frac = (ok, n) => ok >= n ? "certain" : ok === 1 ? `1 in ${n}` : `${ok} in ${n}`;
+  function wantLabel(want, hi, exact) { return exact || want >= hi ? `+${want}` : `+${want} or more`; }
+  function ptsSentence(row, want, exact, positiveOnly, name) {
+    const lo = row[1], hi = row[2], label = wantLabel(want, hi, exact);
+    const okOf = n => exact ? 1 : Math.max(0, hi - want + 1);
+    if (hi >= 1 && lo <= 0) {
+      if (positiveOnly) return `${name} can roll +1 to +${hi}, each equally likely, so ${label} is ${frac(okOf(), hi)}.`;
+      return `${name} can roll ${lo} to +${hi}. A coin flip first decides whether it comes out positive (+1 to +${hi}) or not (${lo} to 0). Then ${label} is ${frac(okOf(), hi)} of the positive values. Together that's ${oneIn(okOf() / (2 * hi))}.`;
+    }
+    const n = hi - lo + 1;
+    return `${name} can roll +${lo} to +${hi} here, each equally likely, so ${label} is ${frac(exact ? 1 : Math.max(0, hi - want + 1), n)}.`;
+  }
+  // Steps for the most likely way the talisman forms, from the engine's breakdown.
+  function stepList(kind, positiveOnly, q, r) {
+    const t1 = D.skill[2 * kind], t2 = D.skill[2 * kind + 1], C = CHARM[kind];
+    const g = 100 - D.no2[kind];
+    const [A, B] = q.skills, n = id => D.names[id];
+    const ord = r.orders[0], steps = [];
+    const rest = ord.factors[ord.factors.length - 1][1];
+    if (ord.key === "AB" || ord.key === "BA") {
+      const X = ord.key === "AB" ? A : B, Y = ord.key === "AB" ? B : A;
+      const r1 = t1.find(x => x[0] === X.id), r2 = t2.find(x => x[0] === Y.id);
+      steps.push(`It picks the first skill. An ${C} has ${t1.length} possible first skills, all equally likely, so ${n(X.id)} comes up 1 in ${t1.length} times.`);
+      steps.push(ptsSentence(r1, X.pts, q.exact, positiveOnly, n(X.id)));
+      steps.push(`It decides whether to add a second skill. ${g}% of ${C}s get one.`);
+      steps.push(`It picks the second skill from ${t2.length} options, so ${n(Y.id)} is 1 in ${t2.length}.`);
+      steps.push(ptsSentence(r2, Y.pts, q.exact, positiveOnly, n(Y.id)));
+    } else if (ord.key === "A-") {
+      const r1 = t1.find(x => x[0] === A.id);
+      steps.push(`It picks the first skill. An ${C} has ${t1.length} possible first skills, all equally likely, so ${n(A.id)} comes up 1 in ${t1.length} times.`);
+      steps.push(ptsSentence(r1, A.pts, q.exact, positiveOnly, n(A.id)));
+      if (q.exact) steps.push(`The talisman must end up with no second skill: either none is added, or the one added cancels out.`);
+      else steps.push(`Whatever second skill it gets doesn't matter here.`);
+    } else {
+      const r2 = t2.find(x => x[0] === A.id);
+      steps.push(`The first skill can be anything except ${n(A.id)} itself (a repeat would delete the second skill).`);
+      steps.push(`It decides whether to add a second skill. ${g}% of ${C}s get one.`);
+      steps.push(`It picks the second skill from ${t2.length} options, so ${n(A.id)} is 1 in ${t2.length}.`);
+      steps.push(ptsSentence(r2, A.pts, false, positiveOnly, n(A.id)));
+    }
+    const slotsTxt = q.exact ? `exactly ${q.slots} slot${q.slots === 1 ? "" : "s"}` : q.slots === 0 ? "any number of slots" : `${q.slots} or more slot${q.slots === 1 ? "" : "s"}`;
+    const onlyTop = r.rows.every((v, i) => i === 20 || v === 0) && r.rows[20] > 0;
+    steps.push(`Last, the slots. The stronger the skills, the fewer slots the game gives. ${onlyTop ? "With both skills at their best, it uses its worst slot odds. " : ""}For this talisman, ${slotsTxt} comes up ${rest >= 0.1 ? pct(rest) + " of the time" : oneIn(rest)}.`);
+    const ol = h("ol", { class: "steps" }, steps.map(t => h("li", { text: t })));
+    const wrap = h("div", null, ol);
+    let sum = `Multiply the steps together: ${oneIn(ord.p)} per ${C}.`;
+    if (r.orders.length > 1) sum += ` It can also form with the skills the other way round (${oneIn(r.orders.slice(1).reduce((a, o) => a + o.p, 0))}), which brings the total to ${oneIn(r.p)}.`;
+    wrap.append(h("p", { class: "md sum", text: sum }));
+    return wrap;
+  }
+  // Which Melding Pot styles make each charm kind.
+  const MELD_FROM = ["Mystery or Halcyon Melding", "Luminous or Halcyon Melding", "Ancient, Halcyon or Juju Melding", "Fabled or Juju Melding"];
+  const INPUTS = {};   // marker: where the Halcyon / Juju pickers go in the Melding Pot panel
+  function meldExplain(q, pts, routes) {
+    const out = [], R = i => routes.find(x => x.style === i);
+    const anyMeld = [0, 1, 2, 3, 4, 5].some(i => R(i).p > 0);
+    if (!anyMeld) return out;
+    // 1. why melded odds differ  2. which styles make the charms that count  3. the Halcyon / Juju
+    // pickers and what they do  4. timing.
+    out.push("The Melding Pot rolls each charm exactly the same way, with one change: a melded charm's second skill is never negative or zero. When a second skill's range goes below zero, that skips the coin flip and doubles its chance.");
+    const kinds = [0, 1, 2, 3].filter(k => E.charm(k, true, q).p > 0);
+    out.push(kinds.map(k => `${CHARM[k]}s come from ${MELD_FROM[k]}.`).join(" ") +
+      " Mystery, Luminous, Ancient and Fabled Melding each turn 3 talismans into 1 charm. Halcyon and Juju turn any 3 from Pawn to Dragon into several, and higher talismans give more.");
+    if (R(4).p > 0 || R(5).p > 0) out.push(INPUTS);
+    for (const i of [4, 5]) {
+      const r = R(i);
+      if (!(r.p > 0)) continue;
+      const c = r.o.counts;
+      if (i === 5) {
+        const e = c[3];
+        const eTxt = e >= 1.995 ? "Juju gives 2 Enduring Charms every time" : `Juju gives ${e.toFixed(1)} Enduring Charms on average`;
+        out.push(`With the talismans picked above, ${eTxt}, plus 1 or 2 Timeworn.`);
+      } else {
+        out.push(`With the talismans picked above, Halcyon gives ${(c[0] + c[1] + c[2]).toFixed(1)} Mystery, Shining or Timeworn Charms on average.`);
+      }
+    }
+    out.push("The talisman is decided the moment you place the order. The quests you wait only count down.");
+    return out;
+  }
+  function slotTable(kind, rows) {
+    const wrap = h("div");
+    const tot = rows.reduce((a, b) => a + b, 0);
+    wrap.append(h("div", { class: "res-title", text: `${CHARM[kind]} slot table` }));
+    wrap.append(h("p", { class: "note", text: "The game rates how strong the skills are, from 0 (weak) to 20 (both at their best). Each row gives the slot chances at that strength. Highlighted rows are where your talisman lands." }));
+    const t = h("table", { class: "slotgrid" }, h("thead", null, h("tr", null, h("th", { text: "Strength" }),
+      ["0 slots", "1", "2", "3"].map(x => h("th", { class: "num-c", text: x })), h("th", { class: "num-c", text: "Your matches" }))));
+    const b = h("tbody");
+    D.slot[kind].forEach((r, i) => {
+      const hit = rows[i] > 0, cls = hit ? "hit" : null;
+      b.append(h("tr", null, h("td", { class: hit ? "hit" : "idx", text: String(i) }),
+        r.map(p => h("td", { class: "num-c" + (hit ? " hit" : ""), text: p + "%" })),
+        h("td", { class: "num-c" + (hit ? " hit" : ""), text: hit ? pct(rows[i] / tot) : "" })));
+    });
+    t.append(b); wrap.append(h("div", { class: "tbl" }, t));
+    return wrap;
+  }
+
+  // ---------- modals ----------
+  function openModal(id) { const m = $(id); m.hidden = false; const c = m.querySelector("[data-close]"); if (c) c.focus(); }
+  $("howBtn").addEventListener("click", () => openModal("howModal"));
+  $("linksBtn").addEventListener("click", () => openModal("linksModal"));
+  $("aboutBtn").addEventListener("click", () => openModal("aboutModal"));
+  for (const m of document.querySelectorAll(".modal")) {
+    m.addEventListener("click", e => { if (e.target === m || e.target.hasAttribute("data-close")) m.hidden = true; });
+  }
+  document.addEventListener("keydown", e => { if (e.key === "Escape") for (const m of document.querySelectorAll(".modal")) m.hidden = true; });
+
+  // The dropdowns are what the player sees, so they win over the saved state. The browser can put
+  // back a dropdown's value without firing "change" (back/forward, form restore on reload), which
+  // left the results showing the old talisman.
+  function readControls() {
+    const num = id => Number($(id).value);
+    const next = {
+      s1: D.names[num("s1")] ? num("s1") : state.s1,
+      s2: num("s2") === 0 || D.names[num("s2")] ? num("s2") : state.s2,
+      p1: num("p1") || state.p1, p2: num("p2") || state.p2,
+      inputs: ["in1", "in2", "in3"].map((id, i) => num(id) >= 1 && num(id) <= 7 ? num(id) : state.inputs[i]),
+    };
+    const changed = next.s1 !== state.s1 || next.s2 !== state.s2 || next.p1 !== state.p1 ||
+      (next.s2 && next.p2 !== state.p2) || next.inputs.some((v, i) => v !== state.inputs[i]);
+    if (changed) Object.assign(state, next);
+    return changed;
+  }
+  const recheck = () => { if (readControls()) update(); };
+  window.addEventListener("pageshow", recheck);
+  window.addEventListener("focus", recheck);
+
+  function start() {
+    update();
+    setTimeout(recheck, 0); setTimeout(recheck, 400);
+  }
+  start();
+})();
+</script>
+</body>
+</html>
