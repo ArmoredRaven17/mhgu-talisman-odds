@@ -118,6 +118,10 @@ details.more summary:focus-visible { outline: 2px solid var(--accent-hover); out
 .slotgrid td.hit { background: var(--row-hit); }
 .slotgrid td.idx { opacity: .6; }
 .note { font-size: 12px; opacity: .7; margin: 0 0 6px; max-width: 78ch; line-height: 1.45; }
+ul.note-list { font-size: 12.5px; opacity: .8; margin: 0 0 10px; padding-left: 18px; max-width: 78ch; line-height: 1.5; }
+ul.note-list li { margin-bottom: 4px; }
+ul.note-list ul { margin: 4px 0 2px; padding-left: 18px; list-style: circle; }
+ul.note-list > li.example { list-style: none; }
 
 /* Modals (as in the sibling apps) */
 .modal { position: fixed; inset: 0; background: #000000a8; display: flex; align-items: center; justify-content: center; z-index: 20; padding: 20px; }
@@ -485,7 +489,7 @@ details.more summary:focus-visible { outline: 2px solid var(--accent-hover); out
     // the dense tables
     const det = panel(card, "more", "More detail");
     const add = (...els) => det.append(...els);
-    if (bestQ) add(slotTable(bestQ.kind, bestQ.r.rows));
+    if (bestQ) add(slotTable(bestQ.kind, bestQ.r.rows, q, bestQ.r.orders[0].key));
     add(h("div", { class: "res-title", text: "Where these skills can appear" }));
     add(h("p", { class: "note", text: "The points each skill can roll on each charm, as the first or the second skill." }));
     const wt = h("table", null, h("thead", null, h("tr", null, h("th", { text: "Skill" }),
@@ -562,10 +566,10 @@ details.more summary:focus-visible { outline: 2px solid var(--accent-hover); out
       steps.push(`It picks the first skill. An ${C} has ${t1.length} possible first skills, all equally likely, so ${n(A.id)} comes up 1 in ${t1.length} times.`);
       steps.push(ptsSentence(r1, A.pts, q.exact, positiveOnly, n(A.id)));
       if (q.exact) steps.push(`The talisman must end up with no second skill: either none is added, or the one added cancels out.`);
-      else steps.push(`Whatever second skill it gets doesn't matter here.`);
+      else steps.push(`Any second skill counts, but it still matters for the slots ("More detail" below explains how).`);
     } else {
       const r2 = t2.find(x => x[0] === A.id);
-      steps.push(`The first skill can be anything except ${n(A.id)} itself (a repeat would delete the second skill).`);
+      steps.push(`The first skill can be anything except ${n(A.id)} itself (a repeat would delete the second skill). Its strength still counts toward the slots.`);
       steps.push(`It decides whether to add a second skill. ${g}% of ${C}s get one.`);
       steps.push(`It picks the second skill from ${t2.length} options, so ${n(A.id)} is 1 in ${t2.length}.`);
       steps.push(ptsSentence(r2, A.pts, false, positiveOnly, n(A.id)));
@@ -609,11 +613,42 @@ details.more summary:focus-visible { outline: 2px solid var(--accent-hover); out
     out.push("The talisman is decided the moment you place the order. The quests you wait only count down.");
     return out;
   }
-  function slotTable(kind, rows) {
+  // Worked example of the strength for this talisman, at the points entered, using the same rows
+  // the engine scores (score() in talisman-engine.js): points / (top / 10) per skill, summed.
+  function strengthExample(kind, q, key) {
+    const t1 = D.skill[2 * kind], t2 = D.skill[2 * kind + 1], [A, B] = q.skills, C = CHARM[kind];
+    const num = v => Number.isInteger(v) ? String(v) : v.toFixed(1);
+    const part = (s, row) => {
+      const v = s.pts * 10 / row[2], name = `${D.names[s.id]} +${s.pts}`, sum = `${s.pts} ÷ ${row[2]} × 10 = ${num(v)}`;
+      const txt = s.pts >= row[2] ? `${name} is the most ${D.names[s.id]} can roll on an ${C}, so it scores the full ${sum}.`
+                                  : `${name}, out of a possible +${row[2]}, scores ${sum}.`;
+      return { v, below: s.pts < row[2], txt };
+    };
+    let parts, tail = [];
+    if (key === "AB" || key === "BA") {
+      const X = key === "AB" ? A : B, Y = key === "AB" ? B : A;
+      parts = [part(X, t1.find(r => r[0] === X.id)), part(Y, t2.find(r => r[0] === Y.id))];
+      tail.push(`Together that's ${num(Math.min(20, parts[0].v + parts[1].v))}.`);
+    } else if (key === "A-") {
+      parts = [part(A, t1.find(r => r[0] === A.id))];
+      tail.push(`Then whatever the second skill adds. It has no second skill if none is added, if the second roll lands on ${D.names[A.id]} again (that deletes it), or if it rolls 0; then it adds nothing, the same as a negative one. A positive one adds its score, so slots get rarer the stronger it is.`);
+    } else {
+      parts = [part(A, t2.find(r => r[0] === A.id))];
+      tail.push("Then whatever the first skill adds.");
+    }
+    if (!q.exact && parts.some(p => p.below)) tail.push("Higher points count too, and they land further down the table.");
+    return ["For this talisman: " + parts[0].txt, ...parts.slice(1).map(p => p.txt), ...tail];
+  }
+  function slotTable(kind, rows, q, key) {
     const wrap = h("div");
     const tot = rows.reduce((a, b) => a + b, 0);
     wrap.append(h("div", { class: "res-title", text: `${CHARM[kind]} slot table` }));
-    wrap.append(h("p", { class: "note", text: "The game rates how strong the skills are, from 0 (weak) to 20 (both at their best). Each row gives the slot chances at that strength. Highlighted rows are where your talisman lands." }));
+    wrap.append(h("ul", { class: "note-list" },
+      h("li", { text: "Strength isn't the points themselves. Each skill is scored out of 10 by how close it is to the most it can roll on this charm: its points ÷ that most × 10. A skill at its most always scores the full 10." }),
+      h("li", { text: "The two skills' scores are added, so the total runs from 0 to 20. No second skill, or a negative one, adds 0." }),
+      h("li", { class: "example" }, h("ul", null, strengthExample(kind, q, key).map(t => h("li", { text: t })))),
+      h("li", { text: "The total, rounded down, picks the row. Each row gives the chance of 0, 1, 2 or 3 slots." }),
+      h("li", { text: "Highlighted rows are where your matching talismans land; the last column shows how they're spread." })));
     const t = h("table", { class: "slotgrid" }, h("thead", null, h("tr", null, h("th", { text: "Strength" }),
       ["0 slots", "1", "2", "3"].map(x => h("th", { class: "num-c", text: x })), h("th", { class: "num-c", text: "Your matches" }))));
     const b = h("tbody");
