@@ -593,10 +593,12 @@ ul.note-list > li.example { list-style: none; }
     if (!anyMeld) return out;
     // 1. why melded odds differ  2. which styles make the charms that count  3. the Halcyon / Juju
     // pickers and what they do  4. timing.
-    out.push("The Melding Pot rolls each charm exactly the same way, with one change: a melded charm's second skill is never negative or zero. When a second skill's range goes below zero, that skips the coin flip and doubles its chance.");
+    out.push("The Melding Pot rolls each charm exactly the same way.");
+    out.push("With one change: a melded charm's second skill never rolls a negative or zero.");
     const kinds = [0, 1, 2, 3].filter(k => E.charm(k, true, q).p > 0);
-    out.push(kinds.map(k => `${CHARM[k]}s come from ${MELD_FROM[k]}.`).join(" ") +
-      " Mystery, Luminous, Ancient and Fabled Melding each turn 3 talismans into 1 charm. Halcyon and Juju turn any 3 from Pawn to Dragon into several, and higher talismans give more.");
+    for (const k of kinds) out.push(`${CHARM[k]}s come from ${MELD_FROM[k]}.`);
+    out.push("Mystery, Luminous, Ancient and Fabled Melding each turn 3 talismans into 1 charm.");
+    out.push("Halcyon and Juju turn any 3 from Pawn to Dragon into several, and higher talismans give more.");
     if (R(4).p > 0 || R(5).p > 0) out.push(INPUTS);
     for (const i of [4, 5]) {
       const r = R(i);
@@ -610,7 +612,7 @@ ul.note-list > li.example { list-style: none; }
         out.push(`With the talismans picked above, Halcyon gives ${(c[0] + c[1] + c[2]).toFixed(1)} Mystery, Shining or Timeworn Charms on average.`);
       }
     }
-    out.push("The talisman is decided the moment you place the order. The quests you wait only count down.");
+    out.push("The talisman is decided the moment you place the order, not when the quest is completed and the result displayed.");
     return out;
   }
   // Worked example of the strength for this talisman, at the points entered, using the same rows
@@ -644,7 +646,7 @@ ul.note-list > li.example { list-style: none; }
     const tot = rows.reduce((a, b) => a + b, 0);
     wrap.append(h("div", { class: "res-title", text: `${CHARM[kind]} slot table` }));
     wrap.append(h("ul", { class: "note-list" },
-      h("li", { text: "Strength isn't the points themselves. Each skill is scored out of 10 by how close it is to the most it can roll on this charm: its points ÷ that most × 10. A skill at its most always scores the full 10." }),
+      h("li", { text: "Strength isn't the points themselves. Each skill is scored out of 10 by how close it is to the most it can roll on this charm: Current Point Value ÷ Max Possible Points × 10." }),
       h("li", { text: "The two skills' scores are added, so the total runs from 0 to 20. No second skill, or a negative one, adds 0." }),
       h("li", { class: "example" }, h("ul", null, strengthExample(kind, q, key).map(t => h("li", { text: t })))),
       h("li", { text: "The total, rounded down, picks the row. Each row gives the chance of 0, 1, 2 or 3 slots." }),
