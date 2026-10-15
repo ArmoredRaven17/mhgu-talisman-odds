@@ -8,6 +8,11 @@ A static single page: enter an MHGU talisman (two skills with points, slots, "th
 this") and see the exact odds of rolling it per charm rolled, from quest charms and melded charms, plus a
 panel per charm-farming quest (runs needed, charms per run).
 
+Skill 1 can be **"Any skill"** (only while a Skill 2 is chosen; it switches off and restores the previous
+Skill 1 when Skill 2 is cleared). The query then has `secondOnly: true`: the named skill must be the
+SECOND skill, the first can be anything at any points. Checked: equals the "-A" order of the one-skill
+query in "this or better", and matches a Monte Carlo of the ROM-verified roller in "exactly this".
+
 Live: https://armoredraven17.github.io/mhgu-talisman-odds/ — deployed by `.github/workflows/deploy-pages.yml`
 on push to `master`, the same setup as `mhgu-armor-skills-explained`.
 

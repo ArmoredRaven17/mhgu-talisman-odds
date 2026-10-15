@@ -63,7 +63,7 @@
       for (const r1 of t1) {
         const firstIs = (B && r1[0] === B.id) ? "B" : (r1[0] === A.id ? "A" : null);
         if (B && !firstIs) continue;                       // a two-skill match needs a named first skill
-        if (!B && !firstIs && q.exact) continue;           // exact single skill must be the first skill
+        if (!B && !firstIs && q.exact && !q.secondOnly) continue;   // exact single skill must be the first skill
         for (const [p1, q1] of ptsDist(r1, positiveOnly)) {
           const base = q1 / t1.length;
           for (const [r2, p2raw, qb] of branches) {
@@ -71,7 +71,11 @@
             const p2 = (r2 && r2[0] === r1[0]) ? 0 : p2raw;     // same tree twice: second is deleted
             const id2 = (r2 && p2 !== 0) ? r2[0] : 0;
             let match = false, key = null;
-            if (B) {
+            if (q.secondOnly) {
+              // "Any skill" first: the named skill must be the SECOND skill, the first can be anything
+              // (a first skill on the same tree deletes the second, so it can never match).
+              if (id2 === A.id && okPts(p2, A.pts, q.exact)) { match = true; key = "-A"; }
+            } else if (B) {
               if (firstIs === "A" && okPts(p1, A.pts, q.exact) && id2 === B.id && okPts(p2, B.pts, q.exact)) { match = true; key = "AB"; }
               else if (firstIs === "B" && okPts(p1, B.pts, q.exact) && id2 === A.id && okPts(p2, A.pts, q.exact)) { match = true; key = "BA"; }
             } else if (firstIs === "A" && okPts(p1, A.pts, q.exact) && (!q.exact || id2 === 0)) { match = true; key = "A-"; }
@@ -122,7 +126,7 @@
           const r2 = t2.find(r => r[0] === A.id), inT1 = t1.some(r => r[0] === A.id);
           f.push(["A second skill rolls", g, `${Math.round(g * 100)}%`]);
           f.push([`Second skill is ${name(A.id)}`, 1 / t2.length, `1 of ${t2.length}`]);
-          f.push([`It rolls ${ptsLabel(A, false)}`, ptsOk(r2, A.pts, false), straddleNote(r2, positiveOnly)]);
+          f.push([`It rolls ${ptsLabel(A, q.exact)}`, ptsOk(r2, A.pts, q.exact), straddleNote(r2, positiveOnly)]);
           if (inT1) f.push([`First skill isn't also ${name(A.id)}`, 1 - 1 / t1.length, "a repeat deletes the second"]);
         }
         const known = f.reduce((a, x) => x[1] == null ? a : a * x[1], 1);
@@ -146,6 +150,14 @@
     function reason(kind, q) {
       const t1 = D.skill[2 * kind], t2 = D.skill[2 * kind + 1], K = KINDS[kind];
       const maxSlots = Math.max(...D.slot[kind].map(r => r.reduce((m, v, i) => v ? i : m, 0)));
+      if (q.secondOnly) {
+        const s = q.skills[0], b = t2.find(r => r[0] === s.id);
+        if (!t2.length) return `${K} Charms never get a second skill`;
+        if (!b) return `${D.names[s.id]} is never a second skill here`;
+        if (s.pts > b[2]) return `${D.names[s.id]} tops out at +${b[2]} as a second skill here`;
+        if (q.slots > maxSlots) return `${K} Charms roll ${maxSlots === 1 ? "1 slot" : maxSlots + " slots"} at most`;
+        return "this combination can't roll here";
+      }
       for (const s of q.skills) {
         const a = t1.find(r => r[0] === s.id), b = t2.find(r => r[0] === s.id);
         if (!a && !b) return `${D.names[s.id]} isn't on the ${K} tables`;

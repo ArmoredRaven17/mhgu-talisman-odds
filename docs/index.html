@@ -284,7 +284,7 @@ ul.note-list > li.example { list-style: none; }
 </div>
 
 <script src="talisman-data.js?v=1"></script>
-<script src="talisman-engine.js?v=1"></script>
+<script src="talisman-engine.js?v=2"></script>
 <script>
 (function () {
   "use strict";
@@ -344,33 +344,53 @@ ul.note-list > li.example { list-style: none; }
   }
 
   // ---------- state ----------
-  let state = { s1: byName("Tenderizer"), p1: 6, s2: byName("Expert"), p2: 10, slots: 3, exact: false, inputs: [5, 5, 5] };
+  // anyFirst: Skill 1 is "Any skill" (any skill, any points) and Skill 2 must be the SECOND skill.
+  // Only valid with a Skill 2; s1/p1 keep the last real Skill 1 so switching back restores it.
+  const ANY = -1;
+  // Skills that ever roll as a SECOND skill on some charm. The four that never do (Blunt, ColdBlooded,
+  // HotBlooded, Elemental) are greyed out in Skill 2; a two-skill talisman is the same either way
+  // round, so they go in Skill 1.
+  const CAN2 = new Set(D.skill.filter((t, i) => i % 2).flatMap(t => t.map(r => r[0])));
+  let state ={ s1: byName("Tenderizer"), p1: 6, s2: byName("Expert"), p2: 10, slots: 3, exact: false, anyFirst: false, inputs: [5, 5, 5] };
   try { const saved = JSON.parse(localStorage.getItem(KEY) || "null"); if (saved && D.names[saved.s1]) state = Object.assign(state, clean(saved)); } catch (e) {}
   function clean(s) {
     const n = (v, lo, hi, d) => Number.isInteger(v) && v >= lo && v <= hi ? v : d;
-    return {
+    const out = {
       s1: D.names[s.s1] ? s.s1 : state.s1, p1: n(s.p1, 1, 14, 1),
       s2: s.s2 === 0 || D.names[s.s2] ? s.s2 : 0, p2: n(s.p2, 1, 14, 1),
       slots: n(s.slots, 0, 3, 0), exact: s.exact === true,
+      anyFirst: s.anyFirst === true && !!D.names[s.s2],
       inputs: Array.isArray(s.inputs) && s.inputs.length === 3 ? s.inputs.map(v => n(v, 1, 7, 5)) : [5, 5, 5],
     };
+    // A saved Skill 2 that can never be a second skill moves to Skill 1 (or is cleared).
+    if (out.s2 && !CAN2.has(out.s2)) {
+      if (CAN2.has(out.s1)) [out.s1, out.s2, out.p1, out.p2] = [out.s2, out.s1, out.p2, out.p1];
+      else out.s2 = 0;
+      out.anyFirst = false;
+    }
+    return out;
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
 
   // ---------- builder ----------
   function fillSkills(sel, withNone) {
     if (withNone) sel.append(h("option", { value: "0", text: "No second skill" }));
-    for (const i of ids) sel.append(h("option", { value: String(i), text: D.names[i] }));
+    for (const i of ids) {
+      const firstOnly = withNone && !CAN2.has(i);
+      sel.append(h("option", { value: String(i), text: firstOnly ? `${D.names[i]} (first skill only)` : D.names[i], disabled: firstOnly ? "" : null }));
+    }
   }
+  const anyOpt = h("option", { value: String(ANY), text: "Any skill" });
+  $("s1").append(anyOpt);
   fillSkills($("s1"), false); fillSkills($("s2"), true);
   for (const id of ["in1", "in2", "in3"])
     for (let r = 1; r <= 7; r++) $(id).append(h("option", { value: String(r), text: E.RARITY[r] }));
 
   // Rebuild a points picker for its skill's values, only when the skill changed.
-  function fillPts(sel, id, value) {
+  function fillPts(sel, id, value, emptyText = "—") {
     if (sel.dataset.skill !== String(id)) {
       sel.replaceChildren();
-      if (!id) sel.append(h("option", { value: "0", text: "—" }));
+      if (!id) sel.append(h("option", { value: "0", text: emptyText }));
       else for (const p of valsOf(id)) sel.append(h("option", { value: String(p), text: "+" + p }));
       sel.dataset.skill = String(id);
     }
@@ -378,20 +398,26 @@ ul.note-list > li.example { list-style: none; }
     sel.disabled = !id;
   }
   function syncForm() {
+    if (!state.s2) state.anyFirst = false;            // "Any skill" turns off without a Skill 2
     state.p1 = fitPts(state.s1, state.p1);
     if (state.s2) state.p2 = fitPts(state.s2, state.p2);
-    $("s1").value = String(state.s1); fillPts($("p1"), state.s1, state.p1);
+    anyOpt.disabled = !state.s2;
+    $("s1").value = state.anyFirst ? String(ANY) : String(state.s1);
+    fillPts($("p1"), state.anyFirst ? 0 : state.s1, state.p1, "Any");
     $("s2").value = String(state.s2); fillPts($("p2"), state.s2, state.p2);
     for (const b of document.querySelectorAll("[data-slots]")) b.setAttribute("aria-pressed", String(Number(b.dataset.slots) === state.slots));
     $("mAtLeast").setAttribute("aria-pressed", String(!state.exact));
     $("mExact").setAttribute("aria-pressed", String(state.exact));
-    $("modeHint").textContent = state.exact
+    $("modeHint").textContent = (state.exact
       ? "Only a talisman exactly like this counts."
-      : "Higher points or more slots count too.";
+      : "Higher points or more slots count too.") +
+      (state.anyFirst ? " Skill 1 can be any skill at any points; Skill 2 must be the second skill." : "");
     ["in1", "in2", "in3"].forEach((id, i) => { $(id).value = String(state.inputs[i]); });
   }
   function onChange() {
-    state.s1 = Number($("s1").value); state.p1 = Number($("p1").value) || 1;
+    const v1 = Number($("s1").value);
+    if (v1 === ANY) state.anyFirst = true;
+    else { state.anyFirst = false; state.s1 = v1; state.p1 = Number($("p1").value) || state.p1 || 1; }
     state.s2 = Number($("s2").value); state.p2 = Number($("p2").value) || state.p2 || 1;
     state.inputs = ["in1", "in2", "in3"].map(id => Number($(id).value));
     update();   // syncForm() then pulls each points value into its skill's range
@@ -404,6 +430,8 @@ ul.note-list > li.example { list-style: none; }
 
   // ---------- results ----------
   function query() {
+    if (state.anyFirst && state.s2)
+      return { skills: [{ id: state.s2, pts: state.p2 }], slots: state.slots, exact: state.exact, secondOnly: true };
     const skills = [{ id: state.s1, pts: state.p1 }];
     if (state.s2) skills.push({ id: state.s2, pts: state.p2 });
     return { skills, slots: state.slots, exact: state.exact };
@@ -419,7 +447,7 @@ ul.note-list > li.example { list-style: none; }
     syncForm(); save();
     const main = $("main"); main.replaceChildren();
     const warn = $("warn");
-    if (state.s2 && state.s2 === state.s1) {
+    if (state.s2 && !state.anyFirst && state.s2 === state.s1) {
       warn.textContent = "Pick two different skills. A talisman can't have the same skill twice.";
       warn.hidden = false;
       main.append(h("div", { class: "card" }, h("p", { class: "md", text: "Choose a different second skill, or set it to No second skill." })));
@@ -438,7 +466,7 @@ ul.note-list > li.example { list-style: none; }
     main.append(card);
 
     // the talisman as entered
-    const name = q.skills.map(s => `${D.names[s.id]} +${s.pts}`).join(" · ");
+    const name = (q.secondOnly ? "Any skill · " : "") + q.skills.map(s => `${D.names[s.id]} +${s.pts}`).join(" · ");
     const pips = h("span", { class: "pips", "aria-label": `${state.slots} decoration slot${state.slots === 1 ? "" : "s"}` },
       [0, 1, 2].map(i => h("span", { class: i < state.slots ? "pip" : "pip off" })));
     card.append(h("div", { class: "card-head" },
@@ -572,7 +600,7 @@ ul.note-list > li.example { list-style: none; }
       steps.push(`The first skill can be anything except ${n(A.id)} itself (a repeat would delete the second skill). Its strength still counts toward the slots.`);
       steps.push(`It decides whether to add a second skill. ${g}% of ${C}s get one.`);
       steps.push(`It picks the second skill from ${t2.length} options, so ${n(A.id)} is 1 in ${t2.length}.`);
-      steps.push(ptsSentence(r2, A.pts, false, positiveOnly, n(A.id)));
+      steps.push(ptsSentence(r2, A.pts, q.exact, positiveOnly, n(A.id)));
     }
     const slotsTxt = q.exact ? `exactly ${q.slots} slot${q.slots === 1 ? "" : "s"}` : q.slots === 0 ? "any number of slots" : `${q.slots} or more slot${q.slots === 1 ? "" : "s"}`;
     const onlyTop = r.rows.every((v, i) => i === 20 || v === 0) && r.rows[20] > 0;
@@ -682,10 +710,11 @@ ul.note-list > li.example { list-style: none; }
     const next = {
       s1: D.names[num("s1")] ? num("s1") : state.s1,
       s2: num("s2") === 0 || D.names[num("s2")] ? num("s2") : state.s2,
+      anyFirst: num("s1") === ANY,
       p1: num("p1") || state.p1, p2: num("p2") || state.p2,
       inputs: ["in1", "in2", "in3"].map((id, i) => num(id) >= 1 && num(id) <= 7 ? num(id) : state.inputs[i]),
     };
-    const changed = next.s1 !== state.s1 || next.s2 !== state.s2 || next.p1 !== state.p1 ||
+    const changed = next.s1 !== state.s1 || next.s2 !== state.s2 || next.p1 !== state.p1 || next.anyFirst !== state.anyFirst ||
       (next.s2 && next.p2 !== state.p2) || next.inputs.some((v, i) => v !== state.inputs[i]);
     if (changed) Object.assign(state, next);
     return changed;
